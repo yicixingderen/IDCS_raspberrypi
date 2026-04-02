@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工业缺陷类别预测系统</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ═══════════ LOGIN SCREEN ═══════════ -->
+<div id="login-screen">
+    <div class="login-card">
+        <h1>工业缺陷类别预测系统</h1>
+        <div class="subtitle">INDUSTRIAL DEFECT CLASSIFICATION SYSTEM</div>
+        <div class="divider"></div>
+        <label>用户名</label>
+        <input type="text" id="login-user" placeholder="请输入用户名" autocomplete="off">
+        <label>密码</label>
+        <input type="password" id="login-pass" placeholder="请输入密码">
+        <div class="login-error" id="login-error"></div>
+        <button class="login-btn" id="login-btn">登 录</button>
+    </div>
+</div>
+
+<!-- ═══════════ MAIN APP ═══════════ -->
+<div id="app">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <h2>IDCS</h2>
+            <div class="logo-sub">DEFECT CLASSIFICATION</div>
+        </div>
+
+        <button class="nav-item active" data-page="dashboard">
+            <span class="nav-icon">&#9632;</span> 仪表盘
+        </button>
+        <button class="nav-item" data-page="detect">
+            <span class="nav-icon">&#9673;</span> 缺陷识别
+        </button>
+        <button class="nav-item" data-page="batch">
+            <span class="nav-icon">&#9881;</span> 批量识别
+        </button>
+        <button class="nav-item" data-page="history">
+            <span class="nav-icon">&#9776;</span> 历史记录
+            <span class="nav-badge" id="nav-badge-history" style="display:none"></span>
+        </button>
+        <button class="nav-item" data-page="categories">
+            <span class="nav-icon">&#9733;</span> 分类浏览
+        </button>
+
+        <div class="sidebar-footer">
+            <div class="device-info" id="device-info">加载中...</div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="content">
+
+        <!-- ─── Dashboard ─── -->
+        <div class="page active" id="page-dashboard">
+            <div class="page-header">
+                <h1>仪表盘</h1>
+                <div class="page-desc">系统概览与数据统计</div>
+            </div>
+            <div class="stat-cards" id="dash-stats">
+                <div class="stat-card"><div class="stat-label">总识别次数</div><div class="stat-value" id="stat-total">0</div></div>
+                <div class="stat-card"><div class="stat-label">今日识别</div><div class="stat-value" id="stat-today">0</div></div>
+                <div class="stat-card"><div class="stat-label">缺陷类别数</div><div class="stat-value" id="stat-classes">0</div></div>
+                <div class="stat-card"><div class="stat-label">最常见缺陷</div><div class="stat-value text-val" id="stat-top">—</div></div>
+            </div>
+            <div class="dashboard-grid">
+                <div class="chart-card">
+                    <h3>CATEGORY DISTRIBUTION</h3>
+                    <canvas id="chart-pie" width="400" height="300"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>RECENT DETECTIONS</h3>
+                    <ul class="recent-list" id="recent-list">
+                        <li class="empty-state"><div class="empty-icon">&#128269;</div>暂无记录</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Single Detection ─── -->
+        <div class="page" id="page-detect">
+            <div class="page-header">
+                <h1>缺陷识别</h1>
+                <div class="page-desc">选择图片或开启摄像头进行实时缺陷分类</div>
+            </div>
+            <div class="detect-layout">
+                <div class="drop-zone" id="drop-zone">
+                    <div class="placeholder" id="drop-placeholder">
+                        <div class="icon">&#128247;</div>
+                        <p>拖拽图片到此处</p>
+                        <p class="hint">或使用下方按钮选择图片/开启摄像头</p>
+                    </div>
+                    <img id="preview-img" style="display:none" alt="preview">
+                </div>
+                <div class="result-panel">
+                    <div class="detect-actions">
+                        <button class="btn btn-secondary" id="btn-select">选择图片</button>
+                        <button class="btn btn-primary" id="btn-predict">开始预测</button>
+                        <button class="btn btn-secondary" id="btn-camera-start">开启摄像头</button>
+                        <button class="btn btn-danger" id="btn-camera-stop" disabled>关闭摄像头</button>
+                    </div>
+                    <div class="result-section">
+                        <h3>ANALYSIS RESULT</h3>
+                        <div class="result-status waiting" id="detect-status">
+                            <span class="dot"></span>等待输入
+                        </div>
+                        <div style="font-size:var(--fs-sm);color:var(--text-muted);">缺陷类别</div>
+                        <div class="result-class" id="result-class">—</div>
+                        <div style="font-size:var(--fs-sm);color:var(--text-muted);margin-top:var(--sp-sm);">置信度</div>
+                        <div class="result-conf" id="result-conf">—</div>
+                        <div class="conf-bar-wrap">
+                            <div class="conf-bar-fill" id="conf-bar"></div>
+                            <div class="conf-bar-text" id="conf-text">—</div>
+                        </div>
+                    </div>
+                    <div class="result-section">
+                        <h3>DEFECT CATEGORIES</h3>
+                        <div class="tags-grid" id="tags-grid"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Batch Detection ─── -->
+        <div class="page" id="page-batch">
+            <div class="page-header">
+                <h1>批量识别</h1>
+                <div class="page-desc">一次选择多张图片进行批量缺陷分类</div>
+            </div>
+            <div class="batch-toolbar">
+                <button class="btn btn-secondary" id="btn-batch-select">选择多张图片</button>
+                <button class="btn btn-primary" id="btn-batch-run" disabled>开始批量预测</button>
+                <span class="batch-progress" id="batch-progress"></span>
+            </div>
+            <div class="table-wrap">
+                <table id="batch-table">
+                    <thead>
+                        <tr><th>缩略图</th><th>文件名</th><th>缺陷类别</th><th>置信度</th><th>状态</th></tr>
+                    </thead>
+                    <tbody id="batch-tbody"></tbody>
+                </table>
+            </div>
+            <div class="empty-state" id="batch-empty">
+                <div class="empty-icon">&#128230;</div>
+                <p>选择多张图片开始批量识别</p>
+            </div>
+        </div>
+
+        <!-- ─── History ─── -->
+        <div class="page" id="page-history">
+            <div class="page-header">
+                <h1>历史记录</h1>
+                <div class="page-desc">查看所有识别记录</div>
+            </div>
+            <div class="table-toolbar">
+                <input type="text" class="search-input" id="history-search" placeholder="搜索文件名或类别...">
+                <button class="btn btn-secondary btn-sm" id="btn-export">导出 CSV</button>
+                <button class="btn btn-danger btn-sm" id="btn-clear-all">清空全部</button>
+            </div>
+            <div class="table-wrap" style="max-height: calc(100vh - 280px); overflow-y: auto;">
+                <table id="history-table">
+                    <thead>
+                        <tr><th>缩略图</th><th>文件名</th><th>缺陷类别</th><th>置信度</th><th>时间</th><th>操作</th></tr>
+                    </thead>
+                    <tbody id="history-tbody"></tbody>
+                </table>
+            </div>
+            <div class="empty-state" id="history-empty" style="display:none;">
+                <div class="empty-icon">&#128203;</div>
+                <p>暂无识别记录</p>
+            </div>
+        </div>
+
+        <!-- ─── Categories ─── -->
+        <div class="page" id="page-categories">
+            <div class="page-header">
+                <h1>分类浏览</h1>
+                <div class="page-desc">按缺陷类别浏览已识别的图片</div>
+            </div>
+            <div class="cat-layout">
+                <div class="cat-list" id="cat-list"></div>
+                <div class="cat-content">
+                    <div class="cat-content-title" id="cat-title">选择左侧类别查看图片</div>
+                    <div class="thumb-grid" id="cat-grid"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- ═══════════ IMAGE PREVIEW MODAL ═══════════ -->
+<div class="modal-overlay" id="modal-preview">
+    <div class="modal-content" style="position:relative;">
+        <button class="modal-close" id="modal-close">&times;</button>
+        <img id="modal-img" src="" alt="preview">
+        <div class="modal-info" id="modal-info"></div>
+    </div>
+</div>
+
+<!-- ═══════════ CONFIRM DIALOG ═══════════ -->
+<div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-box">
+        <p id="confirm-msg">确定要执行此操作吗？</p>
+        <div class="confirm-actions">
+            <button class="btn btn-secondary" id="confirm-no">取消</button>
+            <button class="btn btn-danger" id="confirm-yes">确定</button>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="camera.js"></script>
+</body>
+</html>
