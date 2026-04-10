@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "base_url": "http://192.168.1.100:8080",
+  "auth_token": "",
+  "connect_timeout_sec": 2.0,
+  "read_timeout_sec": 3.0,
+  "endpoints": {
+    "health": "/api/v1/health",
+    "prediction": "/api/v1/idcs/predictions",
+    "alert": "/api/v1/idcs/alerts"
+  }
+}

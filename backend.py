@@ -12,6 +12,7 @@ import webview
 from PIL import Image
 
 from db_manager import HistoryDB
+from lan_gateway import LanGatewayClient
 from predict import predict_
 
 try:
@@ -50,6 +51,8 @@ class Api:
         self._frame_read_failures = 0
         self._last_alert_print_at = None
 
+        self._lan = LanGatewayClient(os.path.join(BASE_DIR, 'lan_gateway_config.json'))
+
     def set_window(self, window):
         self._window = window
 
@@ -59,6 +62,28 @@ class Api:
         if username and password:
             return {'success': True}
         return {'success': False, 'message': '请输入用户名和密码'}
+
+    # ─── LAN Integration ───
+
+    def get_lan_status(self):
+        return self._lan.get_status()
+
+    def test_lan_connection(self):
+        return self._lan.test_connection()
+
+    def _report_lan_prediction(self, payload):
+        try:
+            self._lan.report_prediction(payload)
+        except Exception:
+            # LAN 上报失败不影响主流程
+            pass
+
+    def _report_lan_alert(self, payload):
+        try:
+            self._lan.report_alert(payload)
+        except Exception:
+            # LAN 上报失败不影响主流程
+            pass
 
     # ─── File Selection ───
 
@@ -104,6 +129,16 @@ class Api:
         thumb_bytes = self._make_thumbnail(img)
         image_name = os.path.basename(image_path)
         self._db.add_record(image_path, image_name, thumb_bytes, class_name, float(confidence))
+
+        self._report_lan_prediction({
+            'source': 'web-single',
+            'image_path': image_path,
+            'image_name': image_name,
+            'class_name': class_name,
+            'confidence': float(confidence),
+            'threshold': ALERT_THRESHOLD,
+            'timestamp': datetime.now().isoformat(timespec='seconds'),
+        })
 
         return {
             'class_name': class_name,
@@ -230,6 +265,16 @@ class Api:
                 )
                 self._last_alert_print_at = now
             status_text = f'检测到异常: {result_type}'
+
+            self._report_lan_alert({
+                'source': 'web-camera',
+                'camera_backend': self._camera_backend,
+                'class_name': result_type,
+                'confidence': confidence,
+                'threshold': ALERT_THRESHOLD,
+                'status': status_text,
+                'timestamp': now.isoformat(timespec='seconds'),
+            })
         else:
             self._last_alert_print_at = None
             status_text = '未检测到异常'
