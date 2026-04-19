@@ -12,13 +12,12 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 TARGET_IMAGE_SIZE = (224, 224)
 
 _CLASSES = {
-    '0': '精轧辊印',
-    '1': '夹渣',
-    '2': '铁皮灰',
-    '3': '板道系氧化铁皮',
-    '4': '温度系氧化铁皮',
-    '5': '红铁皮',
-    '6': '表面划痕',
+    '0': '开裂',
+    '1': '内含物',
+    '2': '斑块',
+    '3': '点蚀表面',
+    '4': '轧制氧化皮',
+    '5': '划痕',
 }
 
 _TRANSFORM = transforms.Compose([
@@ -28,6 +27,8 @@ _TRANSFORM = transforms.Compose([
 ])
 
 _MODEL = None
+_MODEL_PATH = None
+_MODEL_MTIME = None
 
 
 def _resolve_model_path():
@@ -67,17 +68,37 @@ def _safe_load_state_dict(model_weight_pth):
 
 
 def _load_model_once():
-    global _MODEL
+    global _MODEL, _MODEL_PATH, _MODEL_MTIME
 
-    if _MODEL is not None:
+    model_weight_pth = _resolve_model_path()
+    model_mtime = os.path.getmtime(model_weight_pth)
+
+    if (
+        _MODEL is not None
+        and _MODEL_PATH == model_weight_pth
+        and _MODEL_MTIME == model_mtime
+    ):
         return _MODEL
 
-    model = mobilenet_shuffle().to(device)
-    model_weight_pth = _resolve_model_path()
     state_dict = _safe_load_state_dict(model_weight_pth)
+
+    num_classes = len(_CLASSES)
+    classifier_weight = state_dict.get('classifier.weight') if isinstance(state_dict, dict) else None
+    if classifier_weight is not None and hasattr(classifier_weight, 'shape'):
+        weight_num_classes = int(classifier_weight.shape[0])
+        if weight_num_classes != num_classes:
+            raise RuntimeError(
+                f'模型分类头输出通道不匹配：权重通道={weight_num_classes}，期望通道={num_classes}。'
+                '请使用6类重新训练并导出权重。'
+            )
+
+    model = mobilenet_shuffle(num_classes=num_classes).to(device)
     model.load_state_dict(state_dict)
     model.eval()
+
     _MODEL = model
+    _MODEL_PATH = model_weight_pth
+    _MODEL_MTIME = model_mtime
     return _MODEL
 
 
@@ -92,7 +113,10 @@ def predict_(img):
 
     with torch.inference_mode():
         output = torch.squeeze(model(img))
-        predict = torch.softmax(output, dim=0)
-        predict_cla = torch.argmax(predict).cpu().numpy()
+        if output.numel() != len(_CLASSES):
+            raise RuntimeError(f'模型输出维度异常：{output.numel()}，期望维度：{len(_CLASSES)}')
 
-    return _CLASSES[str(predict_cla)], predict[predict_cla].item()
+        predict = torch.softmax(output, dim=0)
+        predict_cla = int(torch.argmax(predict).cpu().item())
+
+    return _CLASSES[str(predict_cla)], float(predict[predict_cla].item())

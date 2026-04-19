@@ -36,7 +36,19 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CAMERA_READ_FAIL_LIMIT = 10
 CAMERA_SCAN_INDICES = (0, 1, 2, 3, 4, 5)
 CAMERA_DEVICE_INDEX = 0
-ALERT_THRESHOLD = 0.85
+
+def _read_alert_threshold(default=0.85):
+    raw = os.getenv("IDCS_ALERT_THRESHOLD", str(default)).strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    if 0.0 <= value <= 1.0:
+        return value
+    return default
+
+
+ALERT_THRESHOLD = _read_alert_threshold()
 
 
 class Api:
@@ -490,7 +502,7 @@ class Api:
         import torch
         return {
             'device': 'CUDA' if torch.cuda.is_available() else 'CPU',
-            'model': 'MobileNet-V2 + ShuffleNet + EPSA'
+            'model': 'Mobile_Shuffle + EPSA'
         }
 
     def __del__(self):

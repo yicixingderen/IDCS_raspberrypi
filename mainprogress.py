@@ -31,7 +31,19 @@ CAMERA_SCAN_INDICES = (0, 1, 2, 3, 4, 5)
 
 imgNamepath = ""
 
-ALERT_THRESHOLD = 0.85
+
+def _read_alert_threshold(default=0.85):
+    raw = os.getenv("IDCS_ALERT_THRESHOLD", str(default)).strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    if 0.0 <= value <= 1.0:
+        return value
+    return default
+
+
+ALERT_THRESHOLD = _read_alert_threshold()
 CAMERA_DEVICE_INDEX = 0
 CAMERA_INTERVAL_MS = 900
 
@@ -409,7 +421,7 @@ class Ui_MainWindow(object):
         self.help_text = QLabel(
             "1. 点击「选择图片」按钮进行单图预测\n"
             "2. 点击「开启摄像头」进行实时检测\n"
-            "3. 异常阈值为 0.85，超过即输出异常日志\n"
+            "3. 异常阈值默认 0.85（IDCS_ALERT_THRESHOLD 可配置），超过即输出异常日志\n"
             "4. 点击「关闭摄像头」停止实时检测"
         )
         self.help_text.setObjectName("helpTextLabel")
